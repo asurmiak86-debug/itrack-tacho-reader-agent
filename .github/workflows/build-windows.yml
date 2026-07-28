@@ -1,0 +1,111 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Ustaw Node.js 20 x64
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          architecture: "x64"
+
+      - name: Pokaz wersje
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
+
+      - name: Przygotuj aplikacje
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass
+          .\scripts\build-windows.ps1
+
+      - name: Sprawdz pliki
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ".\dist\runtime\node.exe")) {
+            throw "Brak runtime\node.exe"
+          }
+
+          if (-not (Test-Path ".\dist\agent.js")) {
+            throw "Brak agent.js"
+          }
+
+          $binding = Get-ChildItem `
+            ".\dist\node_modules" `
+            -Filter "pcsclite.node" `
+            -Recurse `
+            -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+
+          if (-not $binding) {
+            throw "Nie znaleziono pcsclite.node"
+          }
+
+          Write-Host "Znaleziono binding:"
+          Write-Host $binding.FullName
+
+          if (-not (Test-Path ".\installer\nssm.exe")) {
+            throw "Brak installer\nssm.exe"
+          }
+
+      - name: Zainstaluj Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Zbuduj instalator
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+          if (-not (Test-Path $iscc)) {
+            throw "Nie znaleziono Inno Setup."
+          }
+
+          & $iscc ".\installer\itrack-tacho-agent.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup zakonczyl prace kodem $LASTEXITCODE"
+          }
+
+      - name: Sprawdz wynik
+        shell: pwsh
+        run: |
+          Get-ChildItem .\output -Force
+
+          $installer = Get-ChildItem `
+            ".\output\*.exe" `
+            -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+
+          if (-not $installer) {
+            throw "Nie powstal instalator EXE."
+          }
+
+          Write-Host "Gotowy instalator:"
+          Write-Host $installer.FullName
+
+      - name: Udostepnij instalator
+        uses: actions/upload-artifact@v4
+        with:
+          name: i-track-Tacho-Agent-Setup-0.5.1
+          path: output/*.exe
+          if-no-files-found: error
+          retention-days: 14
