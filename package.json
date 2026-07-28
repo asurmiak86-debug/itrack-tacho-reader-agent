@@ -1,0 +1,38 @@
+{
+  "name": "itrack-tacho-reader-agent",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "i-track Tacho DDD — agent czytnika kart (Etap 7). Instalowany na komputerze KLIENTA (Windows), łączy się z fizycznym czytnikiem PC/SC (np. ACS ACR39U) i wysyła dane do i-track.",
+  "main": "agent.js",
+  "bin": "agent.js",
+  "scripts": {
+    "start": "node agent.js",
+    "diagnostic": "node diagnostic.js",
+    "check": "node --check agent.js && node --check config.js && node --check pairing.js && node --check diagnostic.js && node --check install-service.js && node --check uninstall-service.js",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/itrack-tacho-agent.exe",
+    "install-service": "node install-service.js",
+    "uninstall-service": "node uninstall-service.js"
+  },
+  "dependencies": {
+    "dotenv": "16.6.1",
+    "nfc-pcsc": "^0.8.1",
+    "node-windows": "^1.0.0-beta.8"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.15.0"
+  },
+  "pkg": {
+    "scripts": ["config.js", "diagnostic.js", "pairing.js"],
+    "assets": [
+      "node_modules/nfc-pcsc/**/*.node",
+      "node_modules/pcsclite/**/*.node",
+      ".env.example"
+    ],
+    "targets": ["node18-win-x64"],
+    "outputPath": "dist"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
